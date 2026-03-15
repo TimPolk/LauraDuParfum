@@ -14,11 +14,11 @@
 - Scroll down to the "API" section 
 - Select create Legacy API key, which will download a "kaggle.json" file
 - In the terminal 
-    `mkdir -p ~/.kaggle`
-    `mv /path/to/downloaded/kaggle.json ~/.kaggle`
-    `chmod 600 ~/.kaggle/kaggle.json`
+  - `mkdir -p ~/.kaggle`
+  - `mv /path/to/downloaded/kaggle.json ~/.kaggle`
+  - `chmod 600 ~/.kaggle/kaggle.json`
 #### Downloading the files
 - Once more into the terminal you will now type in:
-    `cd Data`
-    `kaggle datasets download olgagmiufana1/fragrantica-com-fragrance-dataset`
+  - `cd Data`
+  - `kaggle datasets download olgagmiufana1/fragrantica-com-fragrance-dataset`
 - To automatically unzip the files add `--unzip` to the end of it.
