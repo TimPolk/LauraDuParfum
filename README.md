@@ -5,7 +5,7 @@
 ### Option 1 - manually download
 - Head to the kaggle dataset -- https://www.kaggle.com/datasets/olgagmiufana1/fragrantica-com-fragrance-dataset?select=fra_cleaned.csv
 - Click the download and look down until you see "Download dataset as zip."
-- Unzip file into directory
+- Unzip file into `Data` directory
 ### Option 2 - CLI
 #### Prerequisites
 - `pip install kaggle` into the terminal
