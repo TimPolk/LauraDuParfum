@@ -26,4 +26,4 @@
 ## Our teams cleaned dataset
 To be able to see the results we are getting use our teams cleaned dataset. To obtain this run in the terminal:
 - `python3 clean.py`
-You will then see it appear in the `Data` directory as the name `fragrance_cleaned.csv`.
+- You will then see it appear in the `Data` directory as the name `fragrance_cleaned.csv`.
