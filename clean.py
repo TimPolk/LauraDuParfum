@@ -104,7 +104,7 @@ def main():
         axis=1,
     ).reset_index(drop=True)
 
-    # Drop rows where gender mapping returned NaN (unrecognised values)
+    # Drop rows where gender mapping returned NaN 
     clean_df = clean_df.dropna(subset=["Gender"])
 
     print(clean_df.dtypes)
