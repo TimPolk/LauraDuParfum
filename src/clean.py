@@ -40,10 +40,10 @@ def multi_hot_main_accords(df, results):
     # Builds a complete vocab set of every unique accord across the dataset
     # so every possible accord is guaranteed a column when encoding
     vocab_set = set()
-        for accords in parsed:
-            for accord in accords:
-                vocab_set.add(accord.strip())
-        vocab = sorted(vocab_set)
+    for accords in parsed:
+        for accord in accords:
+            vocab_set.add(accord.strip())
+    vocab = sorted(vocab_set)
 
     # Binary encodes each row against the fixed vocab
     # 1 if the perfume has that accord, 0 if not
