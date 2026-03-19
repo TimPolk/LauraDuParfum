@@ -69,22 +69,28 @@ def multi_hot_main_accords(df, results):
 
 
 def multi_hot_notes(df, results):
-    # Inner helper function to merge notes from three columns into a single clean list
-    def combine_notes(row):
-        notes = []
-        for col in ["Top Notes", "Middle Notes", "Base Notes"]: 
-            val = row.get(col, "")
-            if isinstance(val, str):
-                try:
-                    parsed_list = ast.literal_eval(val) if val.startswith('[') else val.split(',')
-                    # Clean whitespace, lowercase, and remove empty strings
-                    notes.extend([n.strip().lower() for n in parsed_list if n.strip()])
-                except:
-                    pass
-        return notes
+    def extract_from_description(text):
+        if not isinstance(text, str):
+            return []
+        
+        notes_found = []
+        # Standardize text for easier searching
+        text_lower = text.lower()
+        
+        # Look for the section after 'notes are' and before the next category or period
+        parts = text_lower.split("notes are ")
+        
+        for part in parts[1:]:  # Skip the text before the first 'notes are'
+            # Stop at a period or a semicolon
+            clean_part = part.split('.')[0].split(';')[0]
+            # Split by commas and 'and'
+            items = clean_part.replace(' and ', ',').split(',')
+            notes_found.extend([i.strip() for i in items if i.strip()])
+            
+        return notes_found
 
     # Create a Series where each row contains a list of all notes for that perfume
-    all_notes_series = df.apply(combine_notes, axis=1)
+    all_notes_series = df["Description"].apply(extract_from_description)
 
     # Establish a 1% frequency threshold to manage high-dimensional data
     threshold = len(df) * 0.01
@@ -106,7 +112,7 @@ def multi_hot_notes(df, results):
         columns=[f"note_{v}" for v in valid_vocab], 
         index=df.index,
     )
-    
+
     results["notes"] = encoded
 
 
