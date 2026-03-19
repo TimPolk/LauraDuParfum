@@ -68,7 +68,8 @@ def multi_hot_main_accords(df, results):
     results["main_accords"] = encoded
 
 
-def multi_hot_notes(df, results): #TODO: Add comments to help explain what each part does (did this late and didn't have time to add comments)
+def multi_hot_notes(df, results):
+    # Inner helper function to merge notes from three columns into a single clean list
     def combine_notes(row):
         notes = []
         for col in ["Top Notes", "Middle Notes", "Base Notes"]: 
@@ -76,18 +77,26 @@ def multi_hot_notes(df, results): #TODO: Add comments to help explain what each 
             if isinstance(val, str):
                 try:
                     parsed_list = ast.literal_eval(val) if val.startswith('[') else val.split(',')
+                    # Clean whitespace, lowercase, and remove empty strings
                     notes.extend([n.strip().lower() for n in parsed_list if n.strip()])
                 except:
                     pass
         return notes
 
+    # Create a Series where each row contains a list of all notes for that perfume
     all_notes_series = df.apply(combine_notes, axis=1)
 
+    # Establish a 1% frequency threshold to manage high-dimensional data
     threshold = len(df) * 0.01
+
+    # Flatten the list of lists to count total occurrences of every unique note
     all_items = [item for sublist in all_notes_series for item in sublist]
     item_counts = pd.Series(all_items).value_counts()
+
+    # Create the final vocabulary: only keep notes that meet the threshold
     valid_vocab = sorted(item_counts[item_counts >= threshold].index.tolist())
 
+    # Inner helper function to convert a list of notes into a binary vector (1s and 0s)
     def row_to_binary(notes):
         note_set = set(notes)
         return [1 if v in note_set else 0 for v in valid_vocab]
@@ -97,6 +106,7 @@ def multi_hot_notes(df, results): #TODO: Add comments to help explain what each 
         columns=[f"note_{v}" for v in valid_vocab], 
         index=df.index,
     )
+    
     results["notes"] = encoded
 
 
