@@ -58,14 +58,46 @@ def multi_hot_main_accords(df, results):
         return binary
 
     encoded = pd.DataFrame(
-        parsed.apply(row_to_binary),
+        parsed.apply(row_to_binary).tolist(),
 
-        columns=[f"{v}" for v in vocab],
+        columns=[f"accord_{v}" for v in vocab],
 
         index=df.index,
     )
 
     results["main_accords"] = encoded
+
+
+def multi_hot_notes(df, results): #TODO: Add comments to help explain what each part does (did this late and didn't have time to add comments)
+    def combine_notes(row):
+        notes = []
+        for col in ["Top Notes", "Middle Notes", "Base Notes"]: 
+            val = row.get(col, "")
+            if isinstance(val, str):
+                try:
+                    parsed_list = ast.literal_eval(val) if val.startswith('[') else val.split(',')
+                    notes.extend([n.strip().lower() for n in parsed_list if n.strip()])
+                except:
+                    pass
+        return notes
+
+    all_notes_series = df.apply(combine_notes, axis=1)
+
+    threshold = len(df) * 0.01
+    all_items = [item for sublist in all_notes_series for item in sublist]
+    item_counts = pd.Series(all_items).value_counts()
+    valid_vocab = sorted(item_counts[item_counts >= threshold].index.tolist())
+
+    def row_to_binary(notes):
+        note_set = set(notes)
+        return [1 if v in note_set else 0 for v in valid_vocab]
+
+    encoded = pd.DataFrame(
+        all_notes_series.apply(row_to_binary).tolist(),
+        columns=[f"note_{v}" for v in valid_vocab], 
+        index=df.index,
+    )
+    results["notes"] = encoded
 
 
 def main():
@@ -85,6 +117,7 @@ def main():
         threading.Thread(target= encode_gender, args=(df, results)),
         threading.Thread(target= encode_rating_count, args=(df, results)),
         threading.Thread(target= multi_hot_main_accords, args=(df, results)),
+        threading.Thread(target=multi_hot_notes, args=(df, results)),
     ]
 
     for t in threads:
@@ -98,6 +131,7 @@ def main():
             df[["Name", "Rating Value"]],
             results["gender"].rename("Gender"),
             results["rating_count"].rename("Rating Count"),
+            results["notes"],
             # No more 'Main Accords' column cause of multi-hot encoding
             results["main_accords"],
         ],
