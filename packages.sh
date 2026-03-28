@@ -1,1 +1,1 @@
-pip install pandas numpy matplotlib scikit-learn kaggle
+pip install pandas numpy matplotlib scikit-learn kaggle hdbscan
