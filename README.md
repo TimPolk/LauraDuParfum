@@ -23,7 +23,6 @@
 - Unzip file into `Data` directory
 ### Option 2 - CLI
 #### Prerequisites
-- `pip install kaggle` into the terminal
 - Log in to your Kaggle account
 - Go to **Account** settings
 - Scroll down to the "API" section 
