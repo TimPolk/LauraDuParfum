@@ -35,7 +35,7 @@ n_noise = (df['Cluster'] == -1).sum()
 print(f"Number of clusters found: {n_clusters}")
 print(f"Noise points (-1): {n_noise} out of {len(df)}\n")
 
-# 3. RECOMMENDATION FUNCTION
+# 3. Recommendation Function
 def test_recommendation_by_name(perfume_name, top_n=5):
         try:
             idx = df[df['Name'].str.contains(perfume_name, case=False, na=False)].index[0]
