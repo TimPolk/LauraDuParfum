@@ -2,3 +2,5 @@ pandas
 scikit-learn
 matplotlib
 jupyter
+umap-learn
+hdbscan
