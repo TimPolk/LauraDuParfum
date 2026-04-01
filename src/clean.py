@@ -1,22 +1,24 @@
 import pandas as pd
 import ast
 import threading
-
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import MinMaxScaler
 
 path = "./Data/fra_perfumes.csv"
 
 
 def encode_gender(df, results):
-    # Converts categorical to nominal
-    # 0 = unisex, 1 = for women, 2 = for men
-
-    gender_map = {
-        "for women and men": 0,
-        "for women": 1,
-        "for men": 2,
-    }
-    col = df["Gender"].str.strip().map(gender_map)
-    results["gender"] = col.astype("int64")
+    # One-hot encodes gender to match multi-hot style of accords/notes
+    gender_col = df["Gender"].str.strip()
+    encoded = pd.DataFrame(
+        {
+            "gender_unisex": (gender_col == "for women and men").astype(int),
+            "gender_women": (gender_col == "for women").astype(int),
+            "gender_men": (gender_col == "for men").astype(int),
+        },
+        index=df.index,
+    )
+    results["gender"] = encoded
 
 
 def encode_rating_count(df, results):
@@ -145,7 +147,7 @@ def main():
     clean_df = pd.concat(
         [
             df[["Name", "Rating Value"]],
-            results["gender"].rename("Gender"),
+            results["gender"],
             results["rating_count"].rename("Rating Count"),
             results["notes"],
             # No more 'Main Accords' column cause of multi-hot encoding
@@ -155,12 +157,19 @@ def main():
     ).reset_index(drop=True)
 
     # Drop rows where gender mapping returned NaN 
-    clean_df = clean_df.dropna(subset=["Gender"])
+    clean_df = clean_df[
+        clean_df[["gender_unisex", "gender_women", "gender_men"]].any(axis=1)]
+    
+    scaler = MinMaxScaler()
+    clean_df[["Rating Value", "Rating Count"]] = scaler.fit_transform(
+        clean_df[["Rating Value", "Rating Count"]]
+    )
 
     print(clean_df.dtypes)
     print(clean_df.head())
 
     clean_df.to_csv("./Data/fragrance_cleaned.csv", index=False)
+
 
 if __name__ == "__main__":
     main()

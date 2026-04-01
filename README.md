@@ -1,5 +1,20 @@
 # L'aura Du Parfum
 
+## Preparing environment
+
+### To continue with a virtual environment \(.venv\)
+- Should have the latest Python installed or Python >= 3.4
+- In terminal you will type out `python3 -m venv name_of_your_venv` (I suggest using a file that starts with a '.' to avoid git adding it to your commits and pushes)
+- In the terminal type in `chmod +x packages.sh`
+- To download all the packages type 
+  - `./packages.sh` 
+- This will run a script to download all the packages
+
+### Downloading Packages without a venv
+- In the terminal type in `chmod +x packages.sh`
+- To download all the packages type 
+  - `./packages.sh` 
+- This will run a script to download all the packages
 ## Dataset download
 
 ### Option 1 - manually download
@@ -8,7 +23,6 @@
 - Unzip file into `Data` directory
 ### Option 2 - CLI
 #### Prerequisites
-- `pip install kaggle` into the terminal
 - Log in to your Kaggle account
 - Go to **Account** settings
 - Scroll down to the "API" section 
