@@ -19,24 +19,56 @@ accords = df[[c for c in df.columns if c.startswith("accord_")]]
 notes = df[[c for c in df.columns if c.startswith("note_")]]
 rating = df[["Rating Value", "Rating Count"]]
 
-X_scent = pd.concat([gender, accords, notes], axis=1)
+# (T) TF-IDF-style reweighting on notes to downweight common notes like "musk"
+idf = np.log(len(notes) / (notes.sum(axis=0) + 1))
+notes_weighted = notes * idf
+
+# (T) Weight feature groups so accords (strongest scent signal) dominate over raw column count
+w_gender, w_accords, w_notes = 0.5, 1.5, 1.0
+X_scent = pd.concat([
+    gender * w_gender,
+    accords * w_accords,
+    notes_weighted * w_notes
+], axis=1)
 
 # 1. Dimensionality Reduction
-reducer = umap.UMAP(n_components=10, metric='cosine', random_state=42)
+# (T) Added n_jobs=-1 for parallel nearest-neighbor search (main UMAP bottleneck)
+# (T) Lower n_neighbors (default 15) speeds up computation with minimal quality loss
+reducer = umap.UMAP(
+    n_components=10,
+    metric='cosine',
+    random_state=42,
+    n_jobs=-1,
+    n_neighbors=12
+)
 X_compressed = reducer.fit_transform(X_scent)
 
 # 2. Clustering
-print("Running HDBSCAN Clustering...")
-clusterer = hdbscan.HDBSCAN(min_cluster_size=10, min_samples=1, cluster_selection_epsilon=0.5, metric='euclidean', core_dist_n_jobs=-1)
+# (T) Tuned for 64k dataset: eom selection merges small clusters up to reduce noise,
+# cluster_selection_epsilon=0.3 allows nearby micro-clusters to merge into meaningful groups,
+# min_samples=3 balances between too permissive (1) and too strict (5 which gave 58% noise)
+clusterer = hdbscan.HDBSCAN(
+    min_cluster_size=15,
+    min_samples=3,
+    cluster_selection_method='eom',
+    cluster_selection_epsilon=0.3,
+    metric='euclidean',
+    core_dist_n_jobs=-1
+)
 df['Cluster'] = clusterer.fit_predict(X_compressed)
 
 n_clusters = df['Cluster'].nunique() - 1 # Subtract 1 because -1 is the noise cluster
 n_noise = (df['Cluster'] == -1).sum()
-print(f"Number of clusters found: {n_clusters}")
-print(f"Noise points (-1): {n_noise} out of {len(df)}\n")
+print(f"\nNumber of clusters found: {n_clusters}")
+print(f"Noise points (-1): {n_noise} out of {len(df)} ({n_noise/len(df)*100:.1f}%)\n")
+
+# (T) Precompute normalized popularity scores for use as a tiebreaker
+scaler = MinMaxScaler()
+df['popularity'] = scaler.fit_transform(df[['Rating Count']])
 
 # 3. Recommendation Function
-def test_recommendation_by_name(perfume_name, top_n=5):
+# (T) Computes similarity per-query on the 10-dim UMAP embedding (no RAM issue + fast)
+def test_recommendation_by_name(perfume_name, top_n=5, cluster_boost=0.05, alpha=0.9):
         try:
             idx = df[df['Name'].str.contains(perfume_name, case=False, na=False)].index[0]
         except IndexError:
@@ -46,33 +78,32 @@ def test_recommendation_by_name(perfume_name, top_n=5):
         target_cluster = df.iloc[idx]['Cluster']
         target_name = df.iloc[idx]['Name']
         
-        # Filter candidates to only those in the exact same cluster 
-        # (If HDBSCAN labeled it as noise (-1), search the whole dataset as a fallback)
+        # (T) Compute cosine similarity on the 10-dim UMAP embedding per query
+        # On 10 dimensions this takes <10ms even for 64k rows — no need to precompute
+        scores = cosine_similarity(X_compressed[[idx]], X_compressed)[0]
+        
+        # (T) Blend similarity + cluster boost + popularity into final ranking score
+        # Cluster boost and popularity are applied to final_scores only, keeping scores as pure cosine similarity
+        final_scores = scores.copy()
         if target_cluster != -1:
-            candidates_idx = df[df['Cluster'] == target_cluster].index
-        else:
-            candidates_idx = df.index
-            
-        # Extract features for the target and the filtered candidates
-        target_features = X_scent.iloc[[idx]]
-        candidate_features = X_scent.iloc[candidates_idx]
+            same_cluster = (df['Cluster'] == target_cluster).values.astype(float)
+            final_scores += same_cluster * cluster_boost
+        final_scores = alpha * final_scores + (1 - alpha) * df['popularity'].values
+
+        # Remove self-match and sort
+        final_scores[idx] = -1
+        top_idx = np.argsort(final_scores)[::-1][:top_n]
         
-        # Calculate Cosine Similarity ONLY on the scent features
-        scores = cosine_similarity(target_features, candidate_features)[0] 
-        
-        # Zip the indices with their scores, remove the exact self-match, and sort
-        scores_list = list(zip(candidates_idx, scores))
-        scores_list = [x for x in scores_list if x[0] != idx] 
-        sorted_scores = sorted(scores_list, key=lambda x: x[1], reverse=True)[:top_n]
+        # (T) Re-sort top results: similarity descending, then popularity as tiebreaker
+        top_idx = sorted(top_idx, key=lambda i: (scores[i], df.iloc[i]['popularity']), reverse=True)
         
         # Print Results
         cluster_label = f"Cluster {target_cluster}" if target_cluster != -1 else "Noise/Unclustered"
         print(f"If you like '{target_name}' ({cluster_label}), you might like:")
         
-        for i, score in sorted_scores:
+        for rank, i in enumerate(top_idx, start=1):
             match = df.iloc[i]
-            # displays the ratings as helpful text without them ruining the math
-            print(f" - {match['Name']} (Similarity: {score:.4f} | Popularity Score: {match['Rating Count']:.3f})")
+            print(f" {rank}. {match['Name']} (Similarity: {scores[i]:.4f} | Popularity Score: {match['Rating Count']:.3f})")
     
 # 4. Test the recommendation
-test_recommendation_by_name("9am Afnan")
+test_recommendation_by_name("Light Blue Dolce&Gabbana")
