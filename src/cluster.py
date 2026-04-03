@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
 import warnings
 import hdbscan
 import umap
@@ -105,5 +106,19 @@ def test_recommendation_by_name(perfume_name, top_n=5, cluster_boost=0.05, alpha
             match = df.iloc[i]
             print(f" {rank}. {match['Name']} (Similarity: {scores[i]:.4f} | Popularity Score: {match['Rating Count']:.3f})")
     
+
+def evaluate_clusters(sample_size=10000):
+    mask = df['Cluster'] != -1
+    X_clustered = X_compressed[mask]
+    labels_clustered = df.loc[mask, 'Cluster']
+
+    print("Running cluster evaluation...")
+    sil = silhouette_score(X_clustered, labels_clustered, metric='euclidean', sample_size=sample_size, random_state=42)
+    ch = calinski_harabasz_score(X_clustered, labels_clustered)
+
+    print(f"Silhouette Coefficient: {sil:.4f}  (range: -1 to 1, higher = better separated)")
+    print(f"Calinski-Harabasz Index: {ch:.2f}  (higher = denser clusters, more separated)\n")
+
 # 4. Test the recommendation
+evaluate_clusters()
 test_recommendation_by_name("Light Blue Dolce&Gabbana")

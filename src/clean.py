@@ -1,7 +1,6 @@
 import pandas as pd
 import ast
 import threading
-from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import MinMaxScaler
 
 path = "./Data/fra_perfumes.csv"
@@ -71,57 +70,81 @@ def multi_hot_main_accords(df, results):
 
 
 def multi_hot_notes(df, results):
-    def extract_from_description(text):
-        if not isinstance(text, str):
-            return []
-        
-        notes_found = []
-        # Standardize text for easier searching
-        text_lower = text.lower()
-        
-        # Look for the section after 'notes are' and before the next category or period
-        parts = text_lower.split("notes are ")
-        
-        for part in parts[1:]:  # Skip the text before the first 'notes are'
-            # Stop at a period or a semicolon
-            clean_part = part.split('.')[0].split(';')[0]
-            # Split by commas and 'and'
-            items = clean_part.replace(' and ', ',').split(',')
-            notes_found.extend([i.strip() for i in items if i.strip()])
-            
-        return notes_found
+    # (TP) Extracts notes by pyramid level (top, middle, base) instead of flat pooling
+    # This allows the clustering model to weight note positions differently
+    def extract_pyramid(text):
+        """Parses description text and returns a dict with top, middle, and base note lists."""
+        top, middle, base = [], [], []
 
-    # Create a Series where each row contains a list of all notes for that perfume
-    all_notes_series = df["Description"].apply(extract_from_description)
+        if not isinstance(text, str):
+            return {"top": top, "middle": middle, "base": base}
+
+        text_lower = text.lower()
+
+        # (TP) Match both plural "notes are" and singular "note is" patterns
+        # Each pattern maps to its target list
+        patterns = [
+            ("top notes are ",    top),
+            ("top note is ",      top),
+            ("middle notes are ", middle),
+            ("middle note is ",   middle),
+            ("base notes are ",   base),
+            ("base note is ",     base),
+        ]
+
+        for trigger, target in patterns:
+            idx = text_lower.find(trigger)
+            if idx == -1:
+                continue
+            # Grab everything after the trigger up to the next period or semicolon
+            after = text_lower[idx + len(trigger):]
+            clean_part = after.split('.')[0].split(';')[0]
+            items = clean_part.replace(' and ', ',').split(',')
+            target.extend([i.strip() for i in items if i.strip()])
+
+        return {"top": top, "middle": middle, "base": base}
+
+    # Extract pyramid for every row
+    pyramids = df["Description"].apply(extract_pyramid)
 
     # Establish a 1% frequency threshold to manage high-dimensional data
     threshold = len(df) * 0.01
 
-    # Flatten the list of lists to count total occurrences of every unique note
-    all_items = [item for sublist in all_notes_series for item in sublist]
-    item_counts = pd.Series(all_items).value_counts()
+    # (TP) Build separate vocabularies for each pyramid level
+    # so top_note_lemon and base_note_lemon are distinct columns
+    encoded_frames = {}
+    for level in ["top", "middle", "base"]:
+        all_items = [item for row in pyramids for item in row[level]]
+        item_counts = pd.Series(all_items).value_counts()
+        valid_vocab = sorted(item_counts[item_counts >= threshold].index.tolist())
 
-    # Create the final vocabulary: only keep notes that meet the threshold
-    valid_vocab = sorted(item_counts[item_counts >= threshold].index.tolist())
+        def row_to_binary(pyramid, level=level, vocab=valid_vocab):
+            note_set = set(pyramid[level])
+            return [1 if v in note_set else 0 for v in vocab]
 
-    # Inner helper function to convert a list of notes into a binary vector (1s and 0s)
-    def row_to_binary(notes):
-        note_set = set(notes)
-        return [1 if v in note_set else 0 for v in valid_vocab]
+        encoded = pd.DataFrame(
+            pyramids.apply(row_to_binary).tolist(),
+            columns=[f"{level}_note_{v}" for v in valid_vocab],
+            index=df.index,
+        )
+        encoded_frames[level] = encoded
 
-    encoded = pd.DataFrame(
-        all_notes_series.apply(row_to_binary).tolist(),
-        columns=[f"note_{v}" for v in valid_vocab], 
-        index=df.index,
-    )
-
-    results["notes"] = encoded
+    results["top_notes"] = encoded_frames["top"]
+    results["middle_notes"] = encoded_frames["middle"]
+    results["base_notes"] = encoded_frames["base"]
 
 
 def main():
     df = pd.read_csv(path)
     df = df.dropna()
     df = df.reset_index(drop=True)
+
+    # (TP) Remove rows with no usable description — can't extract note pyramid without it
+    # Catches empty strings and descriptions with no note keywords
+    has_notes = df["Description"].str.lower().str.contains("notes are|note is", na=False)
+    before = len(df)
+    df = df[has_notes].reset_index(drop=True)
+    print(f"Dropped {before - len(df)} rows with no extractable notes ({len(df)} remaining)")
 
     # Remove gender from the name of the fragrance
     labels = ["for women and men", "for women", "for men"]
@@ -143,14 +166,15 @@ def main():
     for t in threads:
         t.join()
 
-    # Reassemble
+    # (TP) Reassemble with separate top/middle/base note columns instead of flat notes
     clean_df = pd.concat(
         [
             df[["Name", "Rating Value"]],
             results["gender"],
             results["rating_count"].rename("Rating Count"),
-            results["notes"],
-            # No more 'Main Accords' column cause of multi-hot encoding
+            results["top_notes"],
+            results["middle_notes"],
+            results["base_notes"],
             results["main_accords"],
         ],
         axis=1,
