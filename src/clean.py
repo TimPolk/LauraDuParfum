@@ -5,6 +5,10 @@ from sklearn.preprocessing import MinMaxScaler
 
 path = "./Data/fra_perfumes.csv"
 
+# (TP) TF-based frequency thresholds for trimming columns
+TF_UPPER = 0.40
+TF_LOWER = 0.02
+
 
 def encode_gender(df, results):
     # One-hot encodes gender to match multi-hot style of accords/notes
@@ -60,11 +64,18 @@ def multi_hot_main_accords(df, results):
 
     encoded = pd.DataFrame(
         parsed.apply(row_to_binary).tolist(),
-
         columns=[f"accord_{v}" for v in vocab],
-
         index=df.index,
     )
+
+    # (TP) Trim accords by document frequency — too common adds noise, too rare adds sparsity
+    n_rows = len(encoded)
+    col_freq = encoded.sum() / n_rows
+    drop_common = col_freq[col_freq > TF_UPPER].index.tolist()
+    drop_rare = col_freq[col_freq < TF_LOWER].index.tolist()
+    dropped = set(drop_common + drop_rare)
+    print(f"Accords: dropping {len(dropped)} columns — common (>{TF_UPPER*100:.0f}%): {[c.replace('accord_','') for c in drop_common]}, rare (<{TF_LOWER*100:.0f}%): {[c.replace('accord_','') for c in drop_rare]}")
+    encoded = encoded.drop(columns=dropped)
 
     results["main_accords"] = encoded
 
@@ -127,6 +138,17 @@ def multi_hot_notes(df, results):
             columns=[f"{level}_note_{v}" for v in valid_vocab],
             index=df.index,
         )
+
+        # (TP) Trim notes by document frequency — matches the TF logic used in clustering IDF step
+        n_rows = len(encoded)
+        col_freq = encoded.sum() / n_rows
+        drop_common = col_freq[col_freq > TF_UPPER].index.tolist()
+        drop_rare = col_freq[col_freq < TF_LOWER].index.tolist()
+        dropped = set(drop_common + drop_rare)
+        prefix = f"{level}_note_"
+        print(f"{level.capitalize()} notes: dropping {len(dropped)} columns — common (>{TF_UPPER*100:.0f}%): {[c.replace(prefix,'') for c in drop_common]}, rare (<{TF_LOWER*100:.0f}%): {[c.replace(prefix,'') for c in drop_rare]}")
+        encoded = encoded.drop(columns=dropped)
+
         encoded_frames[level] = encoded
 
     results["top_notes"] = encoded_frames["top"]
@@ -189,6 +211,7 @@ def main():
         clean_df[["Rating Value", "Rating Count"]]
     )
 
+    print(f"\nFinal column count: {len(clean_df.columns)}")
     print(clean_df.dtypes)
     print(clean_df.head())
 

@@ -42,73 +42,98 @@ To be able to see the results we are getting use our teams cleaned dataset. To o
 - `python3 src/clean.py`
 - You will then see it appear in the `Data` directory as the name `fragrance_cleaned.csv`.
 
+### What clean.py does
+
+The cleaning script takes the raw Fragrantica dataset and transforms it into a model-ready format through several steps.
+
+Rows with no usable description are dropped entirely since we cannot extract note information from them. Gender labels embedded in the perfume name are stripped out and encoded separately as binary columns (`gender_unisex`, `gender_women`, `gender_men`).
+
+Notes are extracted from the description text by parsing "top notes are", "middle notes are", and "base notes are" patterns. Instead of pooling all notes into a single flat list, they are separated into three pyramid levels with their own column prefixes: `top_note_`, `middle_note_`, and `base_note_`. This preserves where each note sits in the scent pyramid so the clustering model can weight them differently.
+
+Main accords are parsed from the accords list and multi-hot encoded with the `accord_` prefix.
+
+After encoding, a TF-based frequency trim is applied to all note and accord columns. Features that appear in more than 40% of perfumes are too common to be distinctive, and features that appear in less than 2% are too rare to be a reliable signal. Both are removed. This reduces dimensionality and removes noise on both ends before the data reaches the clustering pipeline.
+
+Rating Value and Rating Count are normalized with MinMaxScaler so they sit on a 0–1 scale.
+
 ## How our clustering works
 
-Our clustering pipeline transforms raw perfume data into similarity scores through five stages.
- 
+Our recommendation pipeline transforms cleaned perfume data into ranked suggestions through several stages.
+
 ### 1. Multi-hot encoding
- 
-Each perfume is represented as rows of binary features across three separate groups: "gender_", "accords_", and "notes_". The cleaning script (`clean.py`) handles this encoding using a shared vocabulary built from the entire dataset.
- 
-### 2. IDF reweighting on notes
- 
-Not all notes are equally informative. A note like "musk" appears in thousands of fragrances and tells you very little, while "saffron" is rare and distinctive. We apply an Inverse Document Frequency (IDF) weight to each note column:
- 
+
+Each perfume is represented as rows of binary features across separate groups: `gender_`, `accord_`, `top_note_`, `middle_note_`, and `base_note_`. The cleaning script (`clean.py`) handles this encoding using a shared vocabulary built from the entire dataset, with separate vocabularies per pyramid level so `top_note_lemon` and `base_note_lemon` are distinct columns.
+
+### 2. IDF reweighting
+
+Not all features are equally informative. A note like "musk" or an accord like "woody" appears in thousands of fragrances and tells you very little, while "saffron" is rare and distinctive. We apply an Inverse Document Frequency (IDF) weight to both accord and note columns:
+
 ```
-idf(note) = ln(total_perfumes / (perfumes_with_that_note + 1))
+idf_weight = log(total_perfumes / (perfumes_with_that_feature + 1))
 ```
- 
-Common notes get pushed towards zero. Rare notes are amplified closer to 1. This ensures that rare notes contribute more to similarity than common ones.
- 
+
+Common features get pushed toward zero. Rare features are amplified. This is applied independently to accords and to each note pyramid level (top, middle, base), so rarity is measured within each group.
+
 ### 3. Feature group weighting
- 
-After encoding, notes typically produce hundreds of columns while accords produce around 20-30. Without correction, notes would dominate the similarity calculation purely by column count. We apply explicit group weights before combining:
- 
-| Group   | Weight | Reasoning |
-|---------|--------|-----------|
-| Gender  | 0.5    | Weak signal — many unisex fragrances cross gender lines |
-| Accords | 1.5    | Strongest signal — describes the overall scent character |
-| Notes   | 1.0    | Useful but noisy — parsed from description text, not curated |
- 
-The weighted features are concatenated into a single feature matrix.
- 
+
+After IDF reweighting, we apply explicit group weights to control how much each feature type contributes. Notes are weighted by their position in the scent pyramid since top notes define first impression and base notes are the least distinctive for perceived similarity.
+
+| Group        | Weight | Reasoning |
+|--------------|--------|-----------|
+| Gender       | 0.5    | Weak signal — many unisex fragrances cross gender lines |
+| Accords      | 1.5    | Strongest signal — describes the overall scent character |
+| Top notes    | 1.2    | First impression — most distinctive for perceived similarity |
+| Middle notes | 1.0    | Heart of the fragrance — solid signal |
+| Base notes   | 0.8    | Lingering dry-down — least distinctive for quick comparison |
+
+The weighted features are concatenated into a single feature matrix and then L2-normalized. Normalizing the vectors means Euclidean distance in the embedding space approximates cosine geometry, which keeps UMAP and HDBSCAN aligned without compatibility issues.
+
 ### 4. UMAP dimensionality reduction
- 
-The combined feature matrix has many columns, which is expensive and hard to compare (high dimensionality curse: in very high dimensions data points become muddled). UMAP (Uniform Manifold Approximation and Projection) compresses this down to 10 dimensions and still preserves the integrity of the data.
- 
+
+The combined feature matrix is compressed using UMAP (Uniform Manifold Approximation and Projection) down to 20 dimensions while preserving neighborhood structure. This makes clustering feasible on a dataset of 40k+ perfumes without hitting the curse of dimensionality where all points start to look equidistant in high-dimensional sparse binary data.
+
 ```
-reducer = umap.UMAP(n_components=10, metric='cosine', n_jobs=-1)
+reducer = umap.UMAP(n_components=20, metric='cosine', n_jobs=-1, n_neighbors=20, min_dist=0.1)
 X_compressed = reducer.fit_transform(X_scent)
 ```
- 
-The resulting 10 values per perfume are abstract coordinates that can't be interpreted individually, but distances between them are meaningful.
- 
-### 5. Cosine similarity
- 
-To compare two perfumes, we compute the cosine of the angle between their 10-dimensional vectors:
- 
-```
-dot_product = (a[0]*b[0]) + (a[1]*b[1]) + ... + (a[9]*b[9])
-magnitude_a = sqrt(a[0]**2 + a[1]**2 + ... + a[9]**2)
-magnitude_b = sqrt(b[0]**2 + b[1]**2 + ... + b[9]**2)
- 
-cosine_similarity = dot_product / (magnitude_a * magnitude_b)
-```
- 
-Cosine similarity ranges from -1 to 1 (1 being identical). It measures the direction of two vectors point, not looking at their magnitude, which means two perfumes with the same scent profile but different rating counts will still score as highly similar.
- 
-### Clustering with HDBSCAN
- 
-Before recommendation, we group perfumes into scent families using HDBSCAN (Hierarchical Density-Based Spatial Clustering). This identifies natural groupings (fresh citrus, warm orientals, woody ouds, etc.) unlike other clustering algorithms like k-means clustering which require us to specify a number for clusters before. Perfumes in the same cluster get a slight similarity boost for ranking, but the cluster boundary is soft allowing a different perfume in a different cluster with a high similarity score beat it out.
- 
-### Final ranking
- 
-Each candidate perfume receives a blended score:
- 
-```
-alpha = 0.9
-final_score = alpha * cosine_similarity + (1 - alpha) * popularity
-```
- 
-Where `alpha = 0.9` keeps scent similarity dominant and popularity acts only as a tiebreaker. So the results are ordered by similarity first and foremost. 
 
+Results are cached to disk using joblib with a hash of the input data. If the data or weights haven't changed, subsequent runs load the cached embedding instead of recomputing.
+
+### 5. Clustering with HDBSCAN
+
+Perfumes are grouped into scent families using HDBSCAN (Hierarchical Density-Based Spatial Clustering). Unlike k-means which requires a predefined cluster count, HDBSCAN discovers natural groupings by density and labels uncertain points as noise rather than forcing them into bad clusters. Perfumes in the same cluster receive a small similarity boost during ranking, but the boundary is soft — a strong match in a different cluster will still rank above a weak match in the same cluster.
+
+### 6. Pyramid-aware note similarity
+
+Instead of computing a single cosine similarity on a flattened note vector, we compare notes by their position in the pyramid. If two perfumes share a note at the same pyramid level, that match counts at full weight. If the note appears at adjacent levels it counts at 75%, and if it spans the full distance (top in one, base in another) it counts at 50%.
+
+```
+proximity_weights = [1.0, 0.75, 0.5]  # same level, adjacent, far
+```
+
+This captures how perfumers think about scent composition — two perfumes with cinnamon as a top note are more alike than one with cinnamon on top and another with cinnamon buried in the base.
+
+### 7. Gender compatibility
+
+Gender is applied as a multiplier on the final score rather than a small additive feature. Same gender matches get full weight, either side being unisex gets 75%, and opposite genders get halved. This prevents a men's cologne from dominating recommendations for a women's perfume just because they share some accords.
+
+```
+# same gender = 1.0, unisex involved = 0.75, opposite = 0.5
+scores = scores * gender_compatibility
+```
+
+### 8. Final ranking
+
+Each candidate perfume's final score is a blend of accord similarity (cosine on IDF-weighted accords) and pyramid-aware note similarity, multiplied by gender compatibility and a confidence factor derived from rating count. Perfumes with very few ratings get their scores scaled down so obscure unreviewed fragrances don't dominate over well-established ones.
+
+```
+scores = 0.60 * accord_similarity + 0.40 * note_similarity
+scores = scores * gender_compatibility
+final_scores = scores * confidence
+```
+
+Results are then filtered by a minimum score threshold so recommendations are only shown when the match quality is strong enough to be meaningful.
+
+### Evaluation
+
+Cluster quality is measured with three complementary metrics: Silhouette Coefficient (how well each point fits its cluster vs neighbors), Calinski-Harabasz Index (ratio of between-cluster to within-cluster spread), and Davies-Bouldin Index (average similarity between each cluster and its most similar neighbor). Alongside these, we track cluster size diagnostics like median size, largest cluster, and concentration in the top 10 clusters to catch structural problems the core metrics can miss. Recommendation quality is validated manually against a benchmark set of known perfumes and their expected scent families.
