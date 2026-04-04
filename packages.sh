@@ -1,1 +1,0 @@
-pip install pandas numpy matplotlib scikit-learn kaggle hdbscan umap-learn

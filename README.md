@@ -11,10 +11,7 @@
 - This will run a script to download all the packages
 
 ### Downloading Packages without a venv
-- In the terminal type in `chmod +x packages.sh`
-- To download all the packages type 
-  - `./packages.sh` 
-- This will run a script to download all the packages
+Run `pip install -r requirements.txt`
 ## Dataset download
 
 ### Option 1 - manually download
