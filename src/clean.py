@@ -68,7 +68,7 @@ def multi_hot_main_accords(df, results):
         index=df.index,
     )
 
-    # (TP) Trim accords by document frequency — too common adds noise, too rare adds sparsity
+    # (TP) Trim accords by document frequency
     n_rows = len(encoded)
     col_freq = encoded.sum() / n_rows
     drop_common = col_freq[col_freq > TF_UPPER].index.tolist()
@@ -84,7 +84,6 @@ def multi_hot_notes(df, results):
     # (TP) Extracts notes by pyramid level (top, middle, base) instead of flat pooling
     # This allows the clustering model to weight note positions differently
     def extract_pyramid(text):
-        """Parses description text and returns a dict with top, middle, and base note lists."""
         top, middle, base = [], [], []
 
         if not isinstance(text, str):
@@ -139,7 +138,7 @@ def multi_hot_notes(df, results):
             index=df.index,
         )
 
-        # (TP) Trim notes by document frequency — matches the TF logic used in clustering IDF step
+        # (TP) Trim notes by document frequency
         n_rows = len(encoded)
         col_freq = encoded.sum() / n_rows
         drop_common = col_freq[col_freq > TF_UPPER].index.tolist()
@@ -161,7 +160,7 @@ def main():
     df = df.dropna()
     df = df.reset_index(drop=True)
 
-    # (TP) Remove rows with no usable description — can't extract note pyramid without it
+    # (TP) Remove rows with no usable description
     # Catches empty strings and descriptions with no note keywords
     has_notes = df["Description"].str.lower().str.contains("notes are|note is", na=False)
     before = len(df)
