@@ -435,10 +435,10 @@ def run_automatic_integrated_visuals(perfume_name, top_n=5, cluster_boost=0.05, 
     target_name = df.iloc[idx]['Name']
 
     # Set up figure
-    fig = plt.figure(figsize=(18, 6)) # Shorter figure size
-    gs = GridSpec(1, 1, figure=fig, hspace=0.3)   # Just 1 row for the radar charts
+    fig = plt.figure(figsize=(18, 6)) # figure size
+    gs = GridSpec(1, 1, figure=fig, hspace=0.3) # single row, single column grid
     
-    sub_gs = gs[0, 0].subgridspec(2, 5, height_ratios=[1.3, 1], hspace=1.2, wspace=0.3) # 2 rows: target on top, matches below; 5 columns for target + 4 matches 
+    sub_gs = gs[0, 0].subgridspec(2, 5, height_ratios=[1.3, 1], hspace=1.2, wspace=0.3) # nested grid for target and matches
     
     categories = ['Overall', 'Accords', 'Notes', 'Gender']
     N = len(categories)
