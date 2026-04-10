@@ -1,4 +1,6 @@
 import pandas as pd
+from matplotlib.gridspec import GridSpec
+from matplotlib.lines import Line2D
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
@@ -214,13 +216,103 @@ df['popularity'] = scaler.fit_transform(df[['Rating Count']])
 
 
 
-# 3. Recommendation Function
+# 3. Recommendation Functions
 # (TP) Uses three custom similarity components:
 # - Accord similarity (cosine on IDF-weighted accords)
 # - Pyramid-aware note similarity (same=100%, adjacent=75%, far=50%)
 # - Gender compatibility multiplier (same=1.0, unisex=0.75, opposite=0.5)
 
+def get_recommendation_scores(perfume_name, top_n=5, cluster_boost=0.05, min_score=0.25):
+    """
+    Helper function that computes recommendation similarities.
+    Returns the target index, top match indices, and all score arrays.
+    """
+    try:
+        idx = df[df['Name'].str.contains(perfume_name, case=False, na=False)].index[0]
+    except IndexError:
+        return None, None, None, None, None, None
+
+    target_cluster = df.iloc[idx]['Cluster']
+    target_name = df.iloc[idx]['Name']
+    
+    # (TP) Accord similarity
+    accord_sim = cosine_similarity(accords_weighted.iloc[[idx]], accords_weighted)[0]
+
+    # (TP) Pyramid-aware note similarity 
+    note_sim = compute_note_similarity(idx)
+
+    # (TP) Gender compatibility
+    gender_compat = compute_gender_compat(idx)
+
+    # (TP) Blend accord and note similarity, then apply gender as a multiplier
+    # (TP) Accord higher for smell profiles to be alike
+    scores = 0.75 * accord_sim + 0.25 * note_sim 
+    scores = scores * gender_compat
+
+    # (TP) Cluster boost scaled by similarity
+    final_scores = scores.copy()
+    if target_cluster != -1:
+        same_cluster = (df['Cluster'] == target_cluster).values.astype(float)
+        final_scores += same_cluster * cluster_boost * scores
+
+    # (TP) Confidence multiplier
+    confidence = 0.2 + 0.8 * df['confidence'].values
+    final_scores = final_scores * confidence
+
+    # Zero out unrated and low-confidence perfumes
+    final_scores[df['Rating Count'] == 0] = -1
+    final_scores[df['Rating Count'] < 0.005] = -1
+
+    # (TP) Dampen near-duplicates
+    target_first_word = target_name.split()[0]
+    same_line = df['Name'].str.split().str[0] == target_first_word
+    final_scores[same_line] *= 0.8
+
+    # Remove self-match and sort
+    final_scores[idx] = -1
+    top_idx = np.argsort(final_scores)[::-1][:top_n]
+
+    top_idx = sorted(top_idx, key=lambda i: final_scores[i], reverse=True)
+    top_idx = [i for i in top_idx if final_scores[i] >= min_score]
+
+    return idx, top_idx, final_scores, accord_sim, note_sim, gender_compat
+
 def test_recommendation_by_name(perfume_name, top_n=5, cluster_boost=0.05, min_score=0.25):
+    """
+    Main recommendation function. Uses the helper function to calculate
+    scores and prints the formatted results.
+    """
+    # Fetch all the calculations from the helper function
+    idx, top_idx, final_scores, accord_sim, note_sim, gender_compat = get_recommendation_scores(
+        perfume_name, top_n, cluster_boost, min_score
+    )
+
+    if idx is None:
+        print(f" -> ERROR: Could not find '{perfume_name}' in the dataset.")
+        return
+        
+    target_name = df.iloc[idx]['Name']
+    target_cluster = df.iloc[idx]['Cluster']
+
+    if not top_idx:
+        print(f"No strong matches found for '{target_name}' above threshold {min_score}.")
+        return
+
+    # Print Results
+    cluster_label = f"Cluster {target_cluster}" if target_cluster != -1 else "Noise/Unclustered"
+    query_gender = "unisex" if gender_types[idx][0] else ("women" if gender_types[idx][1] else "men")
+    print(f"If you like '{target_name}' ({cluster_label}, {query_gender}), you might like:")
+    
+    for rank, i in enumerate(top_idx, start=1):
+        match = df.iloc[i]
+        g = "unisex" if gender_types[i][0] else ("women" if gender_types[i][1] else "men")
+        print(f" {rank}. {match['Name']} [{g}] "
+              f"(Score: {final_scores[i]:.4f} | "
+              f"Accords: {accord_sim[i]:.3f} | "
+              f"Notes: {note_sim[i]:.3f} | "
+              f"Gender: {gender_compat[i]:.2f})")
+
+"""def test_recommendation_by_name(perfume_name, top_n=5, cluster_boost=0.05, min_score=0.25):
         try:
             idx = df[df['Name'].str.contains(perfume_name, case=False, na=False)].index[0]
         except IndexError:
@@ -286,10 +378,7 @@ def test_recommendation_by_name(perfume_name, top_n=5, cluster_boost=0.05, min_s
                   f"(Score: {final_scores[i]:.4f} | "
                   f"Accords: {accord_sim[i]:.3f} | "
                   f"Notes: {note_sim[i]:.3f} | "
-                  f"Gender: {gender_compat[i]:.2f})")
-
-
-
+                  f"Gender: {gender_compat[i]:.2f})")"""
 
 # (TP) Expanded cluster diagnostics 
 def evaluate_clusters(sample_size=10000):
@@ -324,4 +413,110 @@ def evaluate_clusters(sample_size=10000):
 
 # 4. Test the recommendation
 evaluate_clusters()
-test_recommendation_by_name("Light Blue Dolce&Gabbana")
+test_recommendation_by_name("9pm Afnan")
+
+# 5. Visualization
+def run_automatic_integrated_visuals(perfume_name, top_n=5, cluster_boost=0.05, min_score=0.25):
+    print(f"\nGenerating Automatic Integrated Visuals for '{perfume_name}'...")
+    
+    try:
+        # Call the unified logic
+        idx, top_idx, final_scores, accord_sim, note_sim, gender_compat = get_recommendation_scores(
+            perfume_name, top_n, cluster_boost, min_score
+        )
+    except IndexError:
+        print(f" -> ERROR: Could not find '{perfume_name}' in dataset.")
+        return
+
+    if not top_idx:
+        print(f"No strong matches found for to visualize.")
+        return
+
+    target_name = df.iloc[idx]['Name']
+
+    # Set up figure
+    fig = plt.figure(figsize=(18, 6)) # Shorter figure size
+    gs = GridSpec(1, 1, figure=fig, hspace=0.3)   # Just 1 row for the radar charts
+    
+    sub_gs = gs[0, 0].subgridspec(2, 5, height_ratios=[1.3, 1], hspace=1.2, wspace=0.3) # 2 rows: target on top, matches below; 5 columns for target + 4 matches 
+    
+    categories = ['Overall', 'Accords', 'Notes', 'Gender']
+    N = len(categories)
+    
+    angles = [n / float(N) * 2 * np.pi for n in range(N)]
+    angles += angles[:1] 
+    
+    target_vals = [1.0, 1.0, 1.0, 1.0]
+    target_vals += target_vals[:1]
+    
+    colors = plt.cm.tab10(np.linspace(0, 1, len(top_idx)))
+    
+    # Plot the target
+    ax_target = fig.add_subplot(sub_gs[0, 2], polar=True)
+    ax_target.plot(angles, target_vals, linewidth=2.5, linestyle='solid', color='gold')
+    ax_target.fill(angles, target_vals, 'gold', alpha=0.25)
+    
+    ax_target.set_xticks(angles[:-1])
+    ax_target.set_xticklabels(categories, fontsize=10, fontweight='bold')
+    ax_target.tick_params(axis='x', pad=12) 
+    
+    ax_target.set_rlabel_position(0)
+    ax_target.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+    ax_target.set_yticklabels([]) 
+    ax_target.set_ylim(0, 1.25) 
+    
+    title_text_target = (f"TARGET: {target_name[:18]}\n"
+                         f"Ovr:1.00 | Acc:1.00\n"
+                         f"Not:1.00 | Gen:1.00")
+    ax_target.set_title(title_text_target, fontsize=12, fontweight='bold', pad=50) 
+    
+    # Plot the matches
+    for rank_idx, (i, color) in enumerate(zip(top_idx, colors)):
+        rank = rank_idx + 1
+        
+        ax3 = fig.add_subplot(sub_gs[1, rank_idx], polar=True)
+        
+        ax3.plot(angles, target_vals, linewidth=1, linestyle='dashed', color='gold', alpha=0.8)
+        ax3.fill(angles, target_vals, 'gold', alpha=0.05)
+        
+        o_score = final_scores[i]
+        a_score = accord_sim[i]
+        n_score = note_sim[i]
+        g_score = gender_compat[i]
+
+        vals = [o_score, a_score, n_score, g_score]
+        vals += vals[:1] 
+        
+        ax3.plot(angles, vals, linewidth=2.5, linestyle='solid', color=color)
+        ax3.fill(angles, vals, color=color, alpha=0.25) 
+        
+        ax3.set_xticks(angles[:-1])
+        ax3.set_xticklabels(categories, fontsize=9, fontweight='bold')
+        ax3.tick_params(axis='x', pad=10) 
+        
+        ax3.set_rlabel_position(0)
+        ax3.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+        ax3.set_yticklabels([]) 
+        ax3.set_ylim(0, 1.25) 
+        
+        match_name = df.iloc[i]["Name"]
+        title_text = (f"#{rank}: {match_name[:15]}\n"
+                      f"Ovr:{o_score:.2f} | Acc:{a_score:.2f}\n"
+                      f"Not:{n_score:.2f} | Gen:{g_score:.2f}")
+        ax3.set_title(title_text, fontsize=10, fontweight='bold', pad=15)
+
+    # Global legend
+    legend_elements = [
+        Line2D([0], [0], color='gold', lw=2.5, label='Target Profile'),
+        Line2D([0], [0], color='gray', lw=2.5, label='Match Profile (Color Varies)'),
+        Line2D([0], [0], color='gold', lw=1, linestyle='dashed', label='Target Baseline (Reference)')
+    ]
+    
+    fig.legend(handles=legend_elements, loc='lower center', ncol=3, fontsize=11, 
+               framealpha=0.9, bbox_to_anchor=(0.5, 0.02))
+    
+    plt.tight_layout(rect=[0, 0.06, 1, 0.96])
+    plt.show()
+
+# Test visualization
+run_automatic_integrated_visuals("9pm Afnan")
