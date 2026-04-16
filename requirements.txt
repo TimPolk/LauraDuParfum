@@ -4,3 +4,4 @@ matplotlib
 jupyter
 umap-learn
 hdbscan
+xgboost

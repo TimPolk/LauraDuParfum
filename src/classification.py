@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics.pairwise import cosine_similarity 
 
 '''
  AMF 3/31/26 -  This file contains helper functions used to aid in multi-label classification. 
@@ -103,4 +104,8 @@ def comparison_print(fragrance, dataframe, model):
 
     print(f"\nThe actual accords of \"{fragrance}\" are: ")
     print(actual_accords_labels[0], "\n")
+
+    # Find the similiarity of the outputs using cosine similarity 
+    cos_sim = cosine_similarity(predicted_accords, actual_accords)[0][0]
+    print(f"The Cosine Similarity of the fragrances are: {cos_sim}")
 
