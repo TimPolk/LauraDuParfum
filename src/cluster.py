@@ -409,13 +409,7 @@ def evaluate_clusters(sample_size=10000):
     total_clustered = mask.sum()
     print(f"Top 10 clusters hold: {top_10}/{total_clustered} ({top_10/total_clustered*100:.1f}%)\n")
 
-
-
-# 4. Test the recommendation
-evaluate_clusters()
-test_recommendation_by_name("9pm Afnan")
-
-# 5. Visualization
+# 4. Visualization
 def run_automatic_integrated_visuals(perfume_name, top_n=5, cluster_boost=0.05, min_score=0.25):
     print(f"\nGenerating Automatic Integrated Visuals for '{perfume_name}'...")
     
@@ -517,6 +511,3 @@ def run_automatic_integrated_visuals(perfume_name, top_n=5, cluster_boost=0.05, 
     
     plt.tight_layout(rect=[0, 0.06, 1, 0.96])
     plt.show()
-
-# Test visualization
-run_automatic_integrated_visuals("9pm Afnan")
