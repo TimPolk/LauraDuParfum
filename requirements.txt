@@ -5,3 +5,4 @@ jupyter
 umap-learn
 hdbscan
 xgboost
+numpy
