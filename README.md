@@ -1,18 +1,14 @@
 # L'aura Du Parfum
 
-## Preparing environment
+## 1. Preparing environment
 
 ### To continue with a virtual environment \(.venv\)
 - Should have the latest Python installed or Python >= 3.4
-- In terminal you will type out `python3 -m venv name_of_your_venv` (I suggest using a file that starts with a '.' to avoid git adding it to your commits and pushes)
-- In the terminal type in `chmod +x packages.sh`
-- To download all the packages type 
-  - `./packages.sh` 
-- This will run a script to download all the packages
+- In terminal you will type out `python -m venv name_of_your_venv` (I suggest using a file that starts with a '.' to avoid git adding it to your commits and pushes)
 
-### Downloading Packages without a venv
+### Downloading Packages
 Run `pip install -r requirements.txt`
-## Dataset download
+## 2. Dataset download
 
 ### Option 1 - manually download
 - Head to the kaggle dataset -- https://www.kaggle.com/datasets/olgagmiufana1/fragrantica-com-fragrance-dataset?select=fra_cleaned.csv
@@ -34,9 +30,26 @@ Run `pip install -r requirements.txt`
   - `kaggle datasets download olgagmiufana1/fragrantica-com-fragrance-dataset`
 - To automatically unzip the files add `--unzip` to the end of it.
 
+## 3. Interact With Our Models and Results 
+- Our project contains two parts that address our problem statement: ```classification_interactive.ipynb``` and ```cluster_interactive.ipynb```:
+
+Run **Accord Classification** Notebook:
+
+```
+jupyter notebook classification_interactive.ipynb
+```
+
+Run **Fragrance Clustering & Recommendation** Notebook:
+
+```
+jupyter notebook cluster_interactive.ipynb
+```
+
+# More Information:
+
 ## Our teams cleaned dataset
 To be able to see the results we are getting use our teams cleaned dataset. To obtain this run in the terminal:
-- `python3 src/clean.py`
+- `python src/clean.py`
 - You will then see it appear in the `Data` directory as the name `fragrance_cleaned.csv`.
 
 ### What clean.py does
