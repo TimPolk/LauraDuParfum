@@ -1,6 +1,14 @@
 # L'aura Du Parfum
 
-## 1. Preparing environment
+L’aura du Parfum is a two-part machine learning model that will predict the main accords of a fragrance and list related fragrances from user input.
+
+**Problem Statement**: Predict the main accords of a fragrance based on its notes and list related fragrances based on user input.
+
+**About the Data Set**:  Our dataset includes 43,733 fragrance entries from the Kaggle Dataset, [Fragrantica.com Fragrance Dataset](https://www.kaggle.com/datasets/olgagmiufana1/fragrantica-com-fragrance-dataset), by user Olga G (miufana1), with categorical data about their Name, Rating value, Gender, Top Notes, Middle Notes, Base Notes, and Accords.
+
+**Impact**: Our impact of our project is to streamline the research process when it comes to picking and reviewing fragrances.
+
+## Preparing environment:
 
 ### To continue with a virtual environment \(.venv\)
 - Should have the latest Python installed or Python >= 3.4
@@ -8,7 +16,7 @@
 
 ### Downloading Packages
 Run `pip install -r requirements.txt`
-## 2. Dataset download
+## Dataset download
 
 ### Option 1 - manually download
 - Head to the kaggle dataset -- https://www.kaggle.com/datasets/olgagmiufana1/fragrantica-com-fragrance-dataset?select=fra_cleaned.csv
@@ -30,8 +38,8 @@ Run `pip install -r requirements.txt`
   - `kaggle datasets download olgagmiufana1/fragrantica-com-fragrance-dataset`
 - To automatically unzip the files add `--unzip` to the end of it.
 
-## 3. Interact With Our Models and Results 
-- Our project contains two parts that address our problem statement: ```classification_interactive.ipynb``` and ```cluster_interactive.ipynb```:
+## Interact With Our Models and Results 
+Our project contains two parts that address our problem statement: ```classification_interactive.ipynb``` and ```cluster_interactive.ipynb```:
 
 Run **Accord Classification** Notebook:
 
