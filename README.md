@@ -1,10 +1,21 @@
+<div align="center">
+
 # L'aura Du Parfum
 
-L’aura du Parfum is a two-part machine learning model that will predict the main accords of a fragrance and list related fragrances from user input.
+</div>
+
+<p align="center">
+  <img src="./images/lauraduparfum.png" width="50%" />
+</p>
+
+**L’aura du Parfum** is a two-part machine learning model that will predict the main accords of a fragrance and list related fragrances from user input.
 
 **Problem Statement**: Predict the main accords of a fragrance based on its notes and list related fragrances based on user input.
 
 **About the Data Set**:  Our dataset includes 43,733 fragrance entries from the Kaggle Dataset, [Fragrantica.com Fragrance Dataset](https://www.kaggle.com/datasets/olgagmiufana1/fragrantica-com-fragrance-dataset), by user Olga G (miufana1), with categorical data about their Name, Rating value, Gender, Top Notes, Middle Notes, Base Notes, and Accords.
+
+**Our Solution**: To predict the accords of a fragrance, we used a One-vs-Rest (OVR) Classifier with XGBoost (Extreme Gradient Boosting) model as a parameter and MLSMOTE (Multi-Label Synthetic Minority Over-sampling Technique) to address accord class imbalance in our dataset. To list related fragrances from user input, we used UMAP (Uniform Manifold Approximation and Projection) for dimensionality reduction and HDBSCAN (Hierarchical Density-Based Spatial Clustering of Applications with Noise) for clustering, followed by a custom similarity engine based on notes, accords, and gender.
+
 
 **Impact**: Our impact of our project is to streamline the research process when it comes to picking and reviewing fragrances.
 
