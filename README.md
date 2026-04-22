@@ -2,11 +2,14 @@
 
 # L'aura Du Parfum
 
+<br>
+<br>
 </div>
-
 <p align="center">
-  <img src="./images/fragranceimage.png" width="50%" />
+  <img src="./images/fragranceimage.png" width="60%" />
 </p>
+<br>
+<br>
 
 **L’aura du Parfum** is a two-part machine learning model that will predict the main accords of a fragrance and list related fragrances from user input.
 
