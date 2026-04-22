@@ -3,7 +3,6 @@
 # L'aura Du Parfum
 
 <br>
-<br>
 </div>
 <p align="center">
   <img src="./images/fragranceimage.png" width="60%" />
