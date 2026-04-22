@@ -5,7 +5,7 @@
 </div>
 
 <p align="center">
-  <img src="./images/lauraduparfum.png" width="70%" />
+  <img src="./images/fragranceimage.png" width="50%" />
 </p>
 
 **L’aura du Parfum** is a two-part machine learning model that will predict the main accords of a fragrance and list related fragrances from user input.
